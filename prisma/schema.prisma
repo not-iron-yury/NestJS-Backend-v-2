@@ -15,6 +15,7 @@ model User {
   phone         String?       @unique
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  roles         Role[]        @relation("UserRoles")
   authProviders AuthAccount[]
 
   @@map("users")
@@ -41,4 +42,13 @@ enum AuthProvider {
   SMS
   GOOGLE
   GITHUB
+}
+
+// Роли и права (описание ролей вне Призмы)
+model Role {
+  id    String @id @default(uuid())
+  name  String @unique
+  users User[] @relation("UserRoles")
+
+  @@map("roles")
 }
