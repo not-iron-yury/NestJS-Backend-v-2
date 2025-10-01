@@ -1,9 +1,9 @@
 -- CreateTable
 CREATE TABLE "public"."users" (
     "id" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "password" TEXT NOT NULL,
     "name" TEXT,
+    "email" TEXT,
+    "phone" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -12,3 +12,6 @@ CREATE TABLE "public"."users" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "public"."users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_phone_key" ON "public"."users"("phone");

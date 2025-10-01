@@ -7,13 +7,38 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Основная информация о пользователе
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String        @id @default(uuid())
+  name          String?
+  email         String?       @unique
+  phone         String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  authProviders AuthAccount[]
 
   @@map("users")
+}
+
+// Все способы авторизации
+model AuthAccount {
+  id           String       @id @default(uuid())
+  provider     AuthProvider // тип аккаунта (EMAIL, SMS, GOOGLE...)
+  providerId   String // реальные данные (email, phone, googleId...)
+  passwordHash String? // renamed (более явно)
+  passwordAlgo String? // опционально (bcrypt, argon2 и т.д.)
+  user         User         @relation(fields: [userId], references: [id])
+  userId       String
+  isVerified   Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  @@unique([provider, providerId])
+  @@map("auth_account")
+}
+
+enum AuthProvider {
+  EMAIL
+  SMS
+  GOOGLE
+  GITHUB
 }
