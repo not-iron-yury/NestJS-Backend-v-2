@@ -15,7 +15,6 @@ model User {
   phone         String?       @unique
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  roles         Role[]        @relation("UserRoles")
   authProviders AuthAccount[]
 
   @@map("users")
@@ -23,15 +22,16 @@ model User {
 
 // Все способы авторизации
 model AuthAccount {
-  id           String       @id @default(uuid())
-  provider     AuthProvider // тип аккаунта (EMAIL, SMS, GOOGLE...)
-  providerId   String // реальные данные (email, phone, googleId...)
-  passwordHash String? // renamed (более явно)
-  passwordAlgo String? // опционально (bcrypt, argon2 и т.д.)
-  user         User         @relation(fields: [userId], references: [id])
-  userId       String
-  isVerified   Boolean      @default(false)
-  createdAt    DateTime     @default(now())
+  id               String             @id @default(uuid())
+  provider         AuthProvider // тип аккаунта (EMAIL, SMS, GOOGLE...)
+  providerId       String // реальные данные (email, phone, googleId...)
+  passwordHash     String? // renamed (более явно)
+  passwordAlgo     String? // опционально (bcrypt, argon2 и т.д.)
+  user             User               @relation(fields: [userId], references: [id])
+  userId           String
+  isVerified       Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  VerificationCode VerificationCode[]
 
   @@unique([provider, providerId])
   @@map("auth_account")
@@ -44,11 +44,15 @@ enum AuthProvider {
   GITHUB
 }
 
-// Роли и права (описание ролей вне Призмы)
-model Role {
-  id    String @id @default(uuid())
-  name  String @unique
-  users User[] @relation("UserRoles")
+// для SMS, email, двухфакторки, восстановления пароля
+model VerificationCode {
+  id            String      @id @default(uuid())
+  authAccount   AuthAccount @relation(fields: [authAccountId], references: [id])
+  authAccountId String      @unique
+  code          String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime    @default(now())
 
-  @@map("roles")
+  @@map("verification_codes")
 }
