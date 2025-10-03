@@ -10,6 +10,7 @@ import { RequestContextMiddleware } from 'src/modules/request-context/request-co
 import { RequestContextModule } from 'src/modules/request-context/request-context.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { VerificationModule } from './modules/verification/verification.module';
 
 const config = {
   isGlobal: true, // модуль будет доступен во всех модулях без импорта
@@ -72,6 +73,7 @@ const logger = {
     RequestContextModule,
     UsersModule,
     AuthModule,
+    VerificationModule,
   ],
   providers: [PrismaService],
   exports: [PrismaService],
