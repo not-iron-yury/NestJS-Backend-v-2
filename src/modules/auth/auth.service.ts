@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { ClientType } from '@prisma/client';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { PrismaService } from 'src/common/services/prisma.service';
 import { ResponseUserDto } from 'src/modules/auth/dto/response-user.dto';
@@ -17,7 +18,10 @@ export class AuthService {
   ) {}
 
   // Создаёт User + AuthAccount(provider=email) в транзакции.
-  async createUserWithEmail(input: CreateUserWithEmailInput): Promise<ResponseUserDto> {
+  async createUserWithEmail(
+    input: CreateUserWithEmailInput,
+    clientType: ClientType,
+  ): Promise<ResponseUserDto> {
     const { email, password, name } = input;
     const passwordHash = await hashPassword(password);
 
@@ -51,7 +55,10 @@ export class AuthService {
   }
 
   // Создаёт User + AuthAccount(provider=sms) в транзакции.
-  async createUserWithPhone(input: CreateUserWithPhoneInput): Promise<ResponseUserDto> {
+  async createUserWithPhone(
+    input: CreateUserWithPhoneInput,
+    clientType: ClientType,
+  ): Promise<ResponseUserDto> {
     const { phone, password, name } = input;
     const passwordHash = password ? await hashPassword(password) : null;
 

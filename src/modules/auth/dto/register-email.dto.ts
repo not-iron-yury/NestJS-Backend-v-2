@@ -1,5 +1,4 @@
-import { ClientType } from '@prisma/client';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, MinLength } from 'class-validator';
 
 export class RegisterEmailDto {
   @IsEmail()
@@ -11,7 +10,4 @@ export class RegisterEmailDto {
 
   @IsString()
   name?: string;
-
-  @IsOptional()
-  clientType?: ClientType = ClientType.WEB;
 }

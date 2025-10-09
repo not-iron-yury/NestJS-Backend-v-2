@@ -1,5 +1,4 @@
-import { ClientType } from '@prisma/client';
-import { IsOptional, IsPhoneNumber, IsString } from 'class-validator';
+import { IsPhoneNumber, IsString } from 'class-validator';
 
 export class RegisterPhoneDto {
   @IsPhoneNumber('RU')
@@ -7,7 +6,4 @@ export class RegisterPhoneDto {
 
   @IsString()
   name?: string;
-
-  @IsOptional()
-  clientType?: ClientType = ClientType.MOBILE;
 }

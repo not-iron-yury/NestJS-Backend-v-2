@@ -1,4 +1,5 @@
 import { Body, Controller, Post } from '@nestjs/common';
+import { ClientType } from '@prisma/client';
 import { RegisterEmailDto } from 'src/modules/auth/dto/register-email.dto';
 import { RegisterPhoneDto } from 'src/modules/auth/dto/register-phone.dto';
 import { ResponseUserDto } from 'src/modules/auth/dto/response-user.dto';
@@ -10,14 +11,14 @@ export class AuthController {
 
   @Post('register/email')
   async createUserWithEmail(@Body() dto: RegisterEmailDto) {
-    const user = await this.authService.createUserWithEmail(dto);
+    const user = await this.authService.createUserWithEmail(dto, ClientType.WEB);
     return new ResponseUserDto(user);
   }
 
   @Post('register/phone')
   async createUserWithPhone(@Body() dto: RegisterPhoneDto) {
     console.log('Controller');
-    const user = await this.authService.createUserWithPhone(dto);
+    const user = await this.authService.createUserWithPhone(dto, ClientType.MOBILE);
     return new ResponseUserDto(user);
   }
 }
