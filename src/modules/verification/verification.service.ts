@@ -1,7 +1,99 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AuthProvider } from '@prisma/client';
+import { createHmac } from 'crypto';
+import { PinoLogger } from 'pino-nestjs';
+import { PrismaService } from 'src/common/services/prisma.service';
+import { UserRepository } from 'src/modules/users/users.repository';
+import { compareCode, generateEmailVerificationCode, hashCode } from 'src/utils/crypto';
+import { emailExpiresAt } from 'src/utils/expires-at';
 import { VerificationRepository } from './verification.repository';
 
 @Injectable()
 export class VerificationService {
-  constructor(private readonly verificationRepository: VerificationRepository) {}
+  private readonly secret = 'kek-secret';
+
+  constructor(
+    private readonly verificationRepository: VerificationRepository,
+    private readonly userRepository: UserRepository,
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+    private readonly logger: PinoLogger,
+  ) {}
+
+  /**
+   * Генерация email-ссылки и отправка письма
+   */
+  async emailSendVerificationCode(
+    authAccountId: string,
+    email: string,
+    tx: PrismaService = this.prisma,
+  ) {
+    const SECRET = this.configService.get<string>('VERIFICATION_SECRET') || this.secret;
+    const APP_URL = this.configService.get<string>('APP_URL') as string;
+
+    // 1. Генерация ссылки
+    const code = generateEmailVerificationCode();
+    const sault = `${email}:${code}`;
+    const signature = createHmac('sha256', SECRET).update(sault).digest('base64url');
+    const emailLink = `${APP_URL}/api/verification/email-confirm?aid=${email}&code=${code}&sig=${signature}`;
+
+    // 2. Создание кода верификации для authAccountId (aid)
+    const codeHash = hashCode(code);
+    const expiresAt = emailExpiresAt();
+
+    // 3. Запись в БД
+    await this.verificationRepository.createOrUpdateCode(authAccountId, codeHash, expiresAt, tx);
+
+    // 4. Отправка письма с ссылкой (симуляция)
+    this.logger.info('Send email with link');
+    this.logger.info(`Link >> ${emailLink}`);
+  }
+
+  /**
+   * Перевыпуск email-ссылки и повторная отправка письма
+   */
+  async emailResendVerificationCode(email: string, tx: PrismaService = this.prisma) {
+    const authAccount = await this.userRepository.findAuthAccount(AuthProvider.EMAIL, email);
+    if (!authAccount) throw new BadRequestException('Несуществующий email');
+
+    await this.emailSendVerificationCode(authAccount.id, email, tx);
+    return { message: 'Ссылка отправлена на почту' };
+  }
+
+  /**
+   * Проверка email-link-token (подтверждение aid в случае успеха)
+   */
+  async emailConfirm(aid: string, code: string, sig: string) {
+    const SECRET = this.configService.get<string>('VERIFICATION_SECRET') || this.secret;
+
+    // 1. Проверка наличия записи в БД
+    const authAccount = await this.verificationRepository.findByAuthAccount(aid);
+    if (!authAccount) throw new BadRequestException('Несуществующий email токен');
+
+    // 2. Проверка просрочки токена
+    if (authAccount.usedAt) throw new BadRequestException('Просроченный email токен');
+
+    // 3. Сравнение токенов
+    const isIdentical = compareCode(authAccount.code, code);
+    if (!isIdentical) throw new UnauthorizedException('Не правильный код в ссылке верификации');
+
+    // 4. Сравнение криптографических сигнатур
+    const validSig = createHmac('sha256', SECRET).update(`${aid}:${code}`).digest('base64url');
+    if (sig !== validSig)
+      throw new UnauthorizedException('Не правильная сигнатура в ссылке верификации');
+
+    // 5. Отмечаем код верификации как использованный и подтверждаем AuthAccount пользователя
+    await this.prisma.$transaction(async (tx: PrismaService) => {
+      await this.verificationRepository.markUsed(aid, tx);
+      await this.userRepository.confirmAuthAccount('EMAIL', aid, tx);
+    });
+    return { message: 'Email подтвержден' };
+  }
+
+  // // Выпуск sms-кода для верификации
+  // async phoneSendVerificationCode(input: string, meta?: ClientMeta) {}
+
+  // // Проверка sms-кода и подтверждение
+  // async phoneConfirm(input: string, meta?: ClientMeta) {}
 }
