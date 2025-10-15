@@ -7,6 +7,8 @@ import { getIdentityField } from 'src/utils/identity-field';
 export class UserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  // ====================== User ====================== //
+
   // Поиск пользователя по ID
   async findById(id: string, tx = this.prisma): Promise<User | null> {
     return await tx.user.findUnique({ where: { id } });
@@ -46,7 +48,17 @@ export class UserRepository {
       .then((data) => data?.user ?? null);
   }
 
-  // Поиск AuthAccount пользователя
+  // Создание пользователя по email или phone
+  async createUser(identifier: string, name: string | null = null, tx = this.prisma) {
+    const field = getIdentityField(identifier);
+    return await tx.user.create({
+      data: { name, [field]: identifier },
+    });
+  }
+
+  // ====================== AuthAccount ====================== //
+
+  // Поиск AuthAccount
   async findAuthAccount(
     provider: AuthProvider,
     providerId: string,
@@ -57,30 +69,37 @@ export class UserRepository {
     });
   }
 
-  // Создание пользователя по email или phone
-  async createUser(identifier: string, name: string | null = null, tx = this.prisma) {
-    const field = getIdentityField(identifier);
-    return await tx.user.create({
-      data: { name, [field]: identifier },
-    });
-  }
+  // Создание AuthAccount
+  async createAuthAccount(
+    params: {
+      provider: AuthProvider;
+      providerId: string;
+      passwordHash: string | null;
+      userId: string;
+    },
+    tx: PrismaService = this.prisma,
+  ) {
+    const { provider, providerId, passwordHash, userId } = params;
 
-  // Создание AuthAccount пользователя
-  async createAuthAccount(params: {
-    provider: AuthProvider;
-    providerId: string;
-    passwordHash: string | null;
-    userId: string;
-    tx: PrismaService;
-  }) {
-    const { provider, providerId, passwordHash, userId, tx = this.prisma } = params;
-    await tx.authAccount.create({
+    return await tx.authAccount.create({
       data: {
         provider,
         providerId,
         passwordHash: passwordHash ?? null,
         userId,
       },
+    });
+  }
+
+  // Подтверждение AuthAccount (при удачной верификации)
+  async confirmAuthAccount(
+    provider: AuthProvider,
+    providerId: string,
+    tx: PrismaService = this.prisma,
+  ) {
+    return await tx.authAccount.update({
+      where: { provider_providerId: { provider, providerId } },
+      data: { isVerified: true },
     });
   }
 }
