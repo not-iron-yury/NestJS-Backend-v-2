@@ -75,17 +75,19 @@ export class UserRepository {
       provider: AuthProvider;
       providerId: string;
       passwordHash: string | null;
+      passwordAlgo: string | null;
       userId: string;
     },
     tx: PrismaService = this.prisma,
   ) {
-    const { provider, providerId, passwordHash, userId } = params;
+    const { provider, providerId, passwordHash, passwordAlgo, userId } = params;
 
     return await tx.authAccount.create({
       data: {
         provider,
         providerId,
         passwordHash: passwordHash ?? null,
+        passwordAlgo: passwordAlgo ?? null,
         userId,
       },
     });

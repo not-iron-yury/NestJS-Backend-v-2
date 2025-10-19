@@ -31,6 +31,7 @@ export class VerificationRepository {
   async findByAuthAccount(authAccountId: string, tx: PrismaService = this.prisma) {
     return await tx.verificationCode.findUnique({
       where: { authAccountId },
+      include: { authAccount: true },
     });
   }
 

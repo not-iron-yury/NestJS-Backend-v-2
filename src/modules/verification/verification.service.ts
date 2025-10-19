@@ -36,7 +36,7 @@ export class VerificationService {
     const code = generateEmailVerificationCode();
     const sault = `${email}:${code}`;
     const signature = createHmac('sha256', SECRET).update(sault).digest('base64url');
-    const emailLink = `${APP_URL}/api/verification/email-confirm?aid=${email}&code=${code}&sig=${signature}`;
+    const emailLink = `${APP_URL}/verification/email-confirm?aid=${authAccountId}&code=${code}&sig=${signature}`;
 
     // 2. Создание кода верификации для authAccountId (aid)
     const codeHash = hashCode(code);
@@ -54,10 +54,16 @@ export class VerificationService {
    * Перевыпуск email-ссылки и повторная отправка письма
    */
   async emailResendVerificationCode(email: string, tx: PrismaService = this.prisma) {
+    // 1. Проверяем наличие уже существующей записи в БД
     const authAccount = await this.userRepository.findAuthAccount(AuthProvider.EMAIL, email);
     if (!authAccount) throw new BadRequestException('Несуществующий email');
 
+    // 2. Проверяем authAccount, если уже подтвержден возвращаем соответствующее сообщение
+    if (authAccount.isVerified) return { message: 'Email уже подтвержден' };
+
+    // 3. Генерируем ссылку верификации и отправляем письмо
     await this.emailSendVerificationCode(authAccount.id, email, tx);
+
     return { message: 'Ссылка отправлена на почту' };
   }
 
@@ -67,26 +73,33 @@ export class VerificationService {
   async emailConfirm(aid: string, code: string, sig: string) {
     const SECRET = this.configService.get<string>('VERIFICATION_SECRET') || this.secret;
 
-    // 1. Проверка наличия записи в БД
-    const authAccount = await this.verificationRepository.findByAuthAccount(aid);
-    if (!authAccount) throw new BadRequestException('Несуществующий email токен');
+    // 1. Пробуем получить данные по верификации и связанному authAccount
+    const verificationTokenWithAuthAcc = await this.verificationRepository.findByAuthAccount(aid);
+    if (!verificationTokenWithAuthAcc || !verificationTokenWithAuthAcc.code)
+      throw new BadRequestException('Несуществующий email токен');
 
-    // 2. Проверка просрочки токена
-    if (authAccount.usedAt) throw new BadRequestException('Просроченный email токен');
+    const { authAccount, ...verificationToken } = verificationTokenWithAuthAcc;
+
+    // 2. Проверка просрочки кода верификации
+    if (verificationToken.usedAt) throw new BadRequestException('Токен верификации был отозван');
+    if (verificationToken.expiresAt < new Date())
+      throw new BadRequestException('Просроченный email токен');
 
     // 3. Сравнение токенов
-    const isIdentical = compareCode(authAccount.code, code);
-    if (!isIdentical) throw new UnauthorizedException('Не правильный код в ссылке верификации');
+    const isIdentical = compareCode(verificationToken.code, code);
+    if (!isIdentical) throw new UnauthorizedException('Не правильный код верификации');
 
     // 4. Сравнение криптографических сигнатур
-    const validSig = createHmac('sha256', SECRET).update(`${aid}:${code}`).digest('base64url');
+    const validSig = createHmac('sha256', SECRET)
+      .update(`${authAccount.providerId}:${code}`)
+      .digest('base64url');
     if (sig !== validSig)
       throw new UnauthorizedException('Не правильная сигнатура в ссылке верификации');
 
     // 5. Отмечаем код верификации как использованный и подтверждаем AuthAccount пользователя
     await this.prisma.$transaction(async (tx: PrismaService) => {
       await this.verificationRepository.markUsed(aid, tx);
-      await this.userRepository.confirmAuthAccount('EMAIL', aid, tx);
+      await this.userRepository.confirmAuthAccount(AuthProvider.EMAIL, authAccount.providerId, tx);
     });
     return { message: 'Email подтвержден' };
   }

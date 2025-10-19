@@ -8,6 +8,7 @@ import {
   CreateUserWithPhoneInput,
 } from 'src/modules/auth/types/create-user-input.type';
 import { UserRepository } from 'src/modules/users/users.repository';
+import { VerificationService } from 'src/modules/verification/verification.service';
 import { hashPassword } from 'src/utils/password';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly userRepository: UserRepository,
+    private readonly verificationService: VerificationService,
   ) {}
 
   // Создаёт User + AuthAccount(provider=email) в транзакции.
@@ -31,19 +33,24 @@ export class AuthService {
         const existingAuthAcc = await this.userRepository.findAuthAccount('EMAIL', email, tx);
         if (existingAuthAcc) throw new ConflictException('Такой пользователь уже существует');
 
-        // 2. Записываем пользователя в БД
+        // 2. Запись пользователя в БД
         const user = await this.userRepository.createUser(email, name);
-
-        // 3. Записываем authAccount пользователя в БД
-        await this.userRepository.createAuthAccount({
-          provider: 'EMAIL',
-          providerId: email,
-          passwordHash,
-          userId: user.id,
+        // 3. Запись authAccount в БД
+        const authAccount = await this.userRepository.createAuthAccount(
+          {
+            provider: 'EMAIL',
+            providerId: email,
+            passwordHash,
+            passwordAlgo: process.env.PASSWORD_ALGO ?? null,
+            userId: user.id,
+          },
           tx,
-        });
+        );
 
-        // 4. Возвращаем данные пользователя
+        // 4. Генерация и отправка email-link-token на email пользователя (для верификации)
+        await this.verificationService.emailSendVerificationCode(authAccount.id, email, tx);
+
+        // 5. Возвращаем данные пользователя
         return user;
       });
     } catch (error) {
@@ -72,13 +79,16 @@ export class AuthService {
         const user = await this.userRepository.createUser(phone, name);
 
         // 3. Записываем authAccount пользователя в БД
-        await this.userRepository.createAuthAccount({
-          provider: 'SMS',
-          providerId: phone,
-          passwordHash,
-          userId: user.id,
+        await this.userRepository.createAuthAccount(
+          {
+            provider: 'SMS',
+            providerId: phone,
+            passwordHash,
+            passwordAlgo: process.env.PASSWORD_ALGO ?? null,
+            userId: user.id,
+          },
           tx,
-        });
+        );
 
         // 4. Возвращаем данные пользователя
         return user;
