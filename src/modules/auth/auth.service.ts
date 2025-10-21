@@ -79,7 +79,7 @@ export class AuthService {
         const user = await this.userRepository.createUser(phone, name);
 
         // 3. Записываем authAccount пользователя в БД
-        await this.userRepository.createAuthAccount(
+        const authAccount = await this.userRepository.createAuthAccount(
           {
             provider: 'SMS',
             providerId: phone,
@@ -90,7 +90,10 @@ export class AuthService {
           tx,
         );
 
-        // 4. Возвращаем данные пользователя
+        // 4. Генерация и отправка email-link-token на email пользователя (для верификации)
+        await this.verificationService.phoneSendVerificationCode(authAccount.id, phone, tx);
+
+        // 5. Возвращаем данные пользователя
         return user;
       });
     } catch (error) {

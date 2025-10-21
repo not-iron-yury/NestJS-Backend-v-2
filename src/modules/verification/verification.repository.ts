@@ -28,9 +28,21 @@ export class VerificationRepository {
   }
 
   // Возвращает актуальную запись о верификации для конкретного authAccountId.
-  async findByAuthAccount(authAccountId: string, tx: PrismaService = this.prisma) {
+  async findByAuthAccountId(authAccountId: string, tx: PrismaService = this.prisma) {
     return await tx.verificationCode.findUnique({
       where: { authAccountId },
+      include: { authAccount: true },
+    });
+  }
+
+  // Возвращает актуальную запись о верификации для конкретного authAccountId.
+  async findByCode(code: string, tx: PrismaService = this.prisma) {
+    return await tx.verificationCode.findFirst({
+      where: {
+        usedAt: null,
+        code,
+        expiresAt: { gte: new Date() },
+      },
       include: { authAccount: true },
     });
   }

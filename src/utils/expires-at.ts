@@ -12,7 +12,7 @@ export function emailExpiresAt() {
   return addTime('hours', hours);
 }
 
-export function phoneExpiresAt() {
+export function smsExpiresAt() {
   const minutes = Number(process.env.SMS_TOKEN_TTL_HOURS ?? 15);
   return addTime('minutes', minutes);
 }
